@@ -6,7 +6,7 @@ from __future__ import unicode_literals
 import frappe
 from frappe import _
 from .exceptions import QuickbooksError
-from .utils import disable_quickbooks_sync_on_exception, make_quickbooks_log
+from .utils import disable_quickbooks_sync_on_exception, make_quickbooks_log, cancel_record
 from pyqb.quickbooks import QuickBooks
 from .sync_customers import *
 from .sync_suppliers import *
@@ -132,6 +132,8 @@ def sync_from_quickbooks_to_erp(quickbooks_settings):
 
 	sync_expenses(quickbooks_obj)
 	sync_entry(quickbooks_obj)
+
+	cancel_record(quickbooks_obj)
 
 def validate_quickbooks_settings(quickbooks_settings):
 	"""

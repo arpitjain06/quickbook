@@ -63,3 +63,59 @@ def pagination(quickbooks_obj, business_objects):
 			quickbooks_result_set.extend(qb_result[business_objects])
 		startposition = startposition + limit_count
 	return quickbooks_result_set
+
+def cancel_record(quickbooks_obj):
+	"""
+		Cancel record in Erpnext which are deleted in QuickBooks
+	"""
+	mapper =  frappe._dict({
+			"Payment": ["quickbooks_payment_id", "Payment Entry", "SI"],
+			"BillPayment": ["quickbooks_payment_id", "Payment Entry", "PI"]
+		})
+	quickbooks_business_objects = ["Payment", "BillPayment"]
+
+	for business_objects in quickbooks_business_objects:
+		query = """
+					select `{0}` from `tab{1}`""".format(mapper[business_objects][0], mapper[business_objects][1])
+		quickbooks_business_objects_ids = frappe.db.sql(query)
+		if quickbooks_business_objects_ids:
+			erp_synced_obj_ids = [id.split("-")[0] for id in  [row[0] for row in quickbooks_business_objects_ids] if id.split("-")[1] == mapper[business_objects][2]]
+			qb_obj_ids = qb_deleted_record(quickbooks_obj, business_objects)
+			deleted_record_from_qb = [row+"-"+mapper[business_objects][2] for row in erp_synced_obj_ids if row not in qb_obj_ids]
+			for qb_obj_ids in deleted_record_from_qb:
+				query = """
+					select name, quickbooks_payment_id from `tab{0}` 
+					where quickbooks_payment_id like '%{1}%' and docstatus != 2 """.format(mapper[business_objects][1], qb_obj_ids)
+				doc_name = frappe.db.sql(query, as_dict=1)
+				if doc_name:
+					frappe.get_doc(mapper[business_objects][1], doc_name[0]["name"]).cancel()
+					frappe.db.commit()
+
+def qb_deleted_record(quickbooks_obj, business_objects):
+	""" Unlike as Erpnext, Quickbooks also support hard delete. 
+		It only support soft delete for masters not for entries.
+		So function is to cancel the entried in Erpnext which are not Soft-deleted in Quickbooks.  
+	"""
+	condition, group_by = "", ""
+	quickbooks_result_set = []
+	if business_objects in ["Payment", "BillPayment"]:
+		record_count = quickbooks_obj.query("""SELECT count(*) from {0}""".format(business_objects))
+		total_record = record_count['QueryResponse']['totalCount']
+		limit_count = 90
+		total_page = total_record / limit_count if total_record % limit_count == 0 else total_record / limit_count + 1
+		startposition , maxresults = 0, 0  
+
+		for i in range(total_page):
+			maxresults = startposition + limit_count
+			if business_objects in ["Payment", "BillPayment"]:
+				group_by =" ORDER BY Id ASC STARTPOSITION {1} MAXRESULTS {2}".format(business_objects, startposition, maxresults)
+			query_result = """SELECT Id FROM {0} {1}""".format(business_objects, group_by)
+			qb_data = quickbooks_obj.query(query_result)
+			qb_result =  qb_data['QueryResponse']
+			if qb_result:
+				ids = []
+				for row in qb_result[business_objects]:
+					ids.append(row.get("Id"))
+				quickbooks_result_set.extend(ids)
+			startposition = startposition + limit_count
+	return quickbooks_result_set
