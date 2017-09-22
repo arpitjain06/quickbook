@@ -128,8 +128,8 @@ def get_account_currency(qb_journal_entry, row, total_amt, posting_type):
 	account_detail_info = get_jv_account_detail(quickbooks_account_reference)
 	account_details['account'] = account_detail_info.get('name')
 	party, party_type = get_party(row), get_party_type(row)
-	
-	if party and party_type:
+
+	if party and party_type and not party_type == "Employee":
 		account_details['party'] = party 
 		account_details['party_type'] = party_type
 
