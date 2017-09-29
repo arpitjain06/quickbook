@@ -6,6 +6,8 @@ from __future__ import unicode_literals
 import frappe
 import json
 from .exceptions import QuickbooksSetupError
+from frappe.utils import cstr, formatdate, format_datetime
+
 
 def disable_quickbooks_sync_on_exception():
 	frappe.db.rollback()
@@ -37,6 +39,15 @@ name=None, request_data={}):
 		
 		log.save(ignore_permissions=True)
 		frappe.db.commit()
+		update_sync_status(status)
+
+def update_sync_status(status):
+	"Update status in Quickbooks setting page when all records are synced from Quickbooks to erpnext"
+	if status == "Success":
+		quickbooks_settings = frappe.get_doc("Quickbooks Settings")
+		quickbooks_settings.status = status
+		quickbooks_settings.save()
+
 
 def pagination(quickbooks_obj, business_objects):
 	condition = ""
@@ -75,8 +86,7 @@ def cancel_record(quickbooks_obj):
 	quickbooks_business_objects = ["Payment", "BillPayment"]
 
 	for business_objects in quickbooks_business_objects:
-		query = """
-					select `{0}` from `tab{1}`""".format(mapper[business_objects][0], mapper[business_objects][1])
+		query = """select `{0}` from `tab{1}`""".format(mapper[business_objects][0], mapper[business_objects][1])
 		quickbooks_business_objects_ids = frappe.db.sql(query)
 		if quickbooks_business_objects_ids:
 			erp_synced_obj_ids = [id.split("-")[0] for id in  [row[0] for row in quickbooks_business_objects_ids] if id.split("-")[1] == mapper[business_objects][2]]
@@ -119,3 +129,64 @@ def qb_deleted_record(quickbooks_obj, business_objects):
 				quickbooks_result_set.extend(ids)
 			startposition = startposition + limit_count
 	return quickbooks_result_set
+
+
+
+def cancel_amended_records(quickbooks_obj, quickbooks_settings):
+	""" Cancel record in Erpnext which are amended in QuickBooks """
+	if quickbooks_settings.status == "Success":
+		for business_objects, value in business_object_mapper().iteritems():
+			amended_qb_obj_ids = amended_record(quickbooks_obj, business_objects, quickbooks_settings, value[2])
+			for row in amended_qb_obj_ids:
+				query = """select name, quickbooks_payment_id from `tab{0}` 
+						where quickbooks_payment_id like '%{1}%' and docstatus != 2 """.format(value[1], row)
+				doc_name = frappe.db.sql(query, as_dict=1)
+				if doc_name:
+					frappe.get_doc(value[1], doc_name[0]["name"]).cancel()
+					frappe.db.commit()
+
+
+def business_object_mapper():
+	return  frappe._dict({
+			"Payment": ["quickbooks_payment_id", "Payment Entry", "SI"],
+			"BillPayment": ["quickbooks_payment_id", "Payment Entry", "PI"]
+			})
+
+def amended_record(quickbooks_obj, business_objects, quickbooks_settings, objct_type):
+	"cancel records in erpnext which are amend"
+	condition, group_by = "", ""
+	quickbooks_result_set = []
+
+	last_sync_datetime = create_datetime(quickbooks_settings)
+	# last_sync_datetime = "2017-09-25T07:15:05-07:00"
+
+	if business_objects in ["Payment", "BillPayment"]:
+		condition ="Where MetaData.LastUpdatedTime > '{0}'".format(last_sync_datetime)
+
+		record_count = quickbooks_obj.query("""SELECT count(*) from {0}""".format(business_objects))
+		total_record = record_count['QueryResponse']['totalCount']
+		limit_count = 90
+		total_page = total_record / limit_count if total_record % limit_count == 0 else total_record / limit_count + 1
+		startposition , maxresults = 0, 0  
+
+		for i in range(total_page):
+			maxresults = startposition + limit_count
+			if business_objects in ["Payment", "BillPayment"]:
+				group_by ="ORDER BY Id ASC STARTPOSITION {1} MAXRESULTS {2}".format(business_objects, startposition, maxresults)
+			query_result = """SELECT Id FROM {0} {1} {2}""".format(business_objects, condition, group_by)
+			qb_data = quickbooks_obj.query(query_result)
+			qb_result =  qb_data['QueryResponse']
+			if qb_result:
+				ids = []
+				for row in qb_result[business_objects]:
+					ids.append(row.get("Id")+"-"+objct_type)
+				quickbooks_result_set.extend(ids)
+			startposition = startposition + limit_count
+	return quickbooks_result_set
+
+def create_datetime(quickbooks_settings):
+	data_time =  str(quickbooks_settings.last_sync_datetime)
+	date= data_time.split(" ")[0]
+	time = data_time.split(" ")[1].split(".")[0]
+	datetime  = str(date)+"T"+str(time)+"-07:00"
+	return datetime

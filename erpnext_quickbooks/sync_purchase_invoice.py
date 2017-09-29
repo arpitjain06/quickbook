@@ -124,9 +124,9 @@ def tax_apply_on_account_details(qb_orders, order_items, quickbooks_settings, st
 				if json.loads(i['item_tax_rate']).keys():
 					account_head = json.loads(i['item_tax_rate']).keys()[0]  
 
-					if account_head in set(account_head_list) and flt(i['quickbooks__tax_code_value']) != 0.0:
+					if account_head in set(account_head_list):
 						taxes_rate_list[account_head] += flt(i['quickbooks__tax_code_value']*i['rate']*i['qty']/100)
-					elif i['quickbooks__tax_code_value'] != 0 and account_head != (None or ""):
+					elif account_head != (None or ""):
 						taxes_rate_list[account_head] = flt(i['quickbooks__tax_code_value']*i['rate']*i['qty']/100)
 						account_head_list.append(account_head)
 
@@ -163,9 +163,9 @@ def calculate_tax_amount(qb_orders, order_items, quickbooks_settings, stock_item
 		if json.loads(i['item_tax_rate']).keys(): 
 			account_head = json.loads(i['item_tax_rate']).keys()[0]
 
-			if account_head in account_head_list and flt(i['quickbooks__tax_code_value']) != 0.0:
+			if account_head in account_head_list:
 				taxes_rate_list[account_head] += flt(i['quickbooks__tax_code_value']*i['rate']*i['qty']/100)
-			elif i['quickbooks__tax_code_value'] != 0 and account_head != (None or ""):
+			elif account_head != (None or ""):
 				taxes_rate_list[account_head] = flt(i['quickbooks__tax_code_value']*i['rate']*i['qty']/100)
 				account_head_list.add(account_head)
 
@@ -211,9 +211,9 @@ def get_individual_item_tax(qb_orders, order_items, quickbooks_settings, stock_i
 				if json.loads(i['item_tax_rate']).keys(): 
 					account_heads = json.loads(i['item_tax_rate']).keys()[0]
 
-					if account_heads in set(account_head_tax_list) and flt(i['quickbooks__tax_code_value']) != 0.0:
+					if account_heads in set(account_head_tax_list):
 						account_expenses_tax[account_heads] += flt(i['quickbooks__tax_code_value']*i['rate']*1/100)
-					elif i['quickbooks__tax_code_value'] != 0 and account_heads != (None or ""):
+					elif account_heads != (None or ""):
 						account_expenses_tax[account_heads] = flt(i['quickbooks__tax_code_value']*i['rate']*1/100)
 						account_head_tax_list.append(account_heads)
 

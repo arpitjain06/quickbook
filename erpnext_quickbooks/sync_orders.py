@@ -15,7 +15,7 @@ def sync_si_orders(quickbooks_obj):
 	get_qb_invoice =  pagination(quickbooks_obj, business_objects)
 	if get_qb_invoice:
 		sync_qb_si_orders(get_qb_invoice, quickbooks_invoice_list)
-
+		
 def sync_qb_si_orders(get_qb_invoice, quickbooks_invoice_list):
 	company_name = frappe.defaults.get_defaults().get("company")
 	default_currency = frappe.db.get_value("Company" ,{"name":company_name},"default_currency")

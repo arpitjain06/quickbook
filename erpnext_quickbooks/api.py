@@ -6,7 +6,7 @@ from __future__ import unicode_literals
 import frappe
 from frappe import _
 from .exceptions import QuickbooksError
-from .utils import disable_quickbooks_sync_on_exception, make_quickbooks_log, cancel_record
+from .utils import disable_quickbooks_sync_on_exception, make_quickbooks_log, cancel_record, cancel_amended_records
 from pyqb.quickbooks import QuickBooks
 from .sync_customers import *
 from .sync_suppliers import *
@@ -58,6 +58,7 @@ def sync_quickbooks_resources():
 				sync_from_quickbooks_to_erp(quickbooks_settings)
 				if quickbooks_settings.erpnext_to_quickbooks:
 					sync_from_erp_to_quickbooks(quickbooks_settings)
+				frappe.db.set_value("Quickbooks Settings", None, "last_sync_datetime", frappe.utils.now())
 				make_quickbooks_log(title="Sync Completed", status="Success", method=frappe.local.form_dict.cmd, 
 				message= "Updated {customers} customer(s)")
 
@@ -110,7 +111,7 @@ def sync_from_quickbooks_to_erp(quickbooks_settings):
 	    company_id=quickbooks_settings.realm_id,
 	    minorversion=3
 	)
-	frappe.db.set_value("Quickbooks Settings", None, "last_sync_datetime", frappe.utils.now())
+	# frappe.db.set_value("Quickbooks Settings", None, "last_sync_datetime", frappe.utils.now())
 	sync_taxagency(quickbooks_obj)
 	sync_tax_rate(quickbooks_obj)
 	sync_tax_code(quickbooks_obj)
@@ -133,7 +134,8 @@ def sync_from_quickbooks_to_erp(quickbooks_settings):
 	sync_expenses(quickbooks_obj)
 	sync_entry(quickbooks_obj)
 
-	cancel_record(quickbooks_obj)
+	# cancel_record(quickbooks_obj)
+	# cancel_amended_records(quickbooks_obj, quickbooks_settings)
 
 def validate_quickbooks_settings(quickbooks_settings):
 	"""

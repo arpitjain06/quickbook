@@ -31,7 +31,8 @@ def get_payment_dict(get_qb_payment):
 					'qb_account_id': entries.get('DepositToAccountRef').get('value'),
 					'qb_si_id':line.get('LinkedTxn')[0].get('TxnId'),
 					'paid_amount': line.get('Amount'),
-					"doc_no": entries.get("DocNumber")
+					"doc_no": entries.get("DocNumber"),
+					"creation_date":entries['MetaData']['LastUpdatedTime']
 					})
 	return recived_payment
 
@@ -176,7 +177,7 @@ def sync_qb_journal_entry_against_si(get_payment_received):
 	quickbooks_settings = frappe.get_doc("Quickbooks Settings", "Quickbooks Settings")
 	for recived_payment in get_payment_received:
  		try:
- 			if not frappe.db.get_value("Payment Entry", {"quickbooks_payment_id": recived_payment.get('Id')}, "name"):
+ 			if not frappe.db.get_value("Payment Entry", {"quickbooks_payment_id": recived_payment.get('Id'), "docstatus": ["!=", 2]}, "name"):
  				create_payment_entry_si(recived_payment, quickbooks_settings)
  		except Exception, e:
  			make_quickbooks_log(title=e.message, status="Error", method="sync_qb_journal_entry_against_si", message=frappe.get_traceback(),
@@ -190,6 +191,8 @@ def create_payment_entry_si(recived_payment, quickbooks_settings):
 		ref_doc = frappe.get_doc("Sales Invoice", invoice_name)
 		si_pe = frappe.new_doc("Payment Entry")
 		si_pe.naming_series = "SI-PE-QB-"
+		si_pe.creation = recived_payment.get("creation_date")
+		si_pe.modified = recived_payment.get("creation_date")
 		si_pe.quickbooks_invoice_reference_no = ref_doc.get('quickbooks_invoice_no')
 		si_pe.quickbooks_payment_reference_no = recived_payment.get('doc_no')
 		si_pe.posting_date = recived_payment.get('TxnDate')
@@ -257,7 +260,8 @@ def get_bill_payment_dict(get_qb_billpayment):
 					"qb_account_id": entries.get('CheckPayment').get('BankAccountRef').get('value'),
 					"qb_pi_id": linked_txn.get('LinkedTxn')[0].get('TxnId'),
 					'paid_amount': linked_txn.get('Amount'),
-					"doc_no": entries.get("DocNumber")
+					"doc_no": entries.get("DocNumber"),
+					"creation_date": entries["MetaData"]["LastUpdatedTime"]
 					})
 	return paid_pi
 
@@ -349,7 +353,7 @@ def sync_qb_journal_entry_against_pi(get_bill_pi):
 	quickbooks_settings = frappe.get_doc("Quickbooks Settings", "Quickbooks Settings")
 	for bill_payment in get_bill_pi:
 		try:
-			if not frappe.db.get_value("Payment Entry", {"quickbooks_payment_id": bill_payment.get('Id')}, "name"):
+			if not frappe.db.get_value("Payment Entry", {"quickbooks_payment_id": bill_payment.get('Id'), "docstatus": ["!=", 2]}, "name"):
 				create_payment_entry_pi(bill_payment, quickbooks_settings)
 		except Exception, e:
 			make_quickbooks_log(title=e.message, status="Error", method="sync_qb_journal_entry_against_pi", message=frappe.get_traceback(),
@@ -366,6 +370,8 @@ def create_payment_entry_pi(bill_payment, quickbooks_settings):
 		ref_doc = frappe.get_doc("Purchase Invoice", invoice_name)
 		pi_pe = frappe.new_doc("Payment Entry")
 		pi_pe.naming_series = "PI-PE-QB-"
+		pi_pe.creation = bill_payment.get("creation_date")
+		pi_pe.modified = bill_payment.get("creation_date")
 		pi_pe.quickbooks_invoice_reference_no = ref_doc.get('quickbooks_bill_no')
 		pi_pe.quickbooks_payment_reference_no = bill_payment.get('doc_no')
 		pi_pe.posting_date = bill_payment.get('TxnDate')
